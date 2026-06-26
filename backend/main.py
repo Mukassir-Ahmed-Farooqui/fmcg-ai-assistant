@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 # LangChain imports
 from langchain_community.utilities import SQLDatabase
 from langchain_community.agent_toolkits import create_sql_agent
-from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_groq import ChatGroq
 
 
 load_dotenv()
@@ -35,13 +35,11 @@ def get_agent():
     if agent_executor is None:
         try:
             db = SQLDatabase.from_uri(db_path)
-            # Use Gemini API
-            llm = ChatGoogleGenerativeAI(model="gemini-1.5-pro-latest", temperature=0)
-            
+            llm = ChatGroq(model="llama-3.3-70b-versatile", temperature=0)
+
             # Create SQL Agent
             agent_executor = create_sql_agent(
                 llm=llm,
-                toolkit=None, # Will use db instead of toolkit in newer versions, or directly pass db
                 db=db,
                 agent_type="zero-shot-react-description",
                 verbose=True,
@@ -49,7 +47,7 @@ def get_agent():
             )
         except Exception as e:
             print(f"Error initializing agent: {e}")
-            return None
+            raise
     return agent_executor
 
 @app.on_event("startup")
@@ -62,11 +60,10 @@ async def chat(request: ChatRequest):
     agent = get_agent()
     if not agent:
         raise HTTPException(status_code=500, detail="AI Agent not initialized. Please check API keys and Database.")
-    
+
     user_message = request.message
-    
+
     try:
-        # Provide a specific prompt to ensure context
         prompt = f"""You are an AI assistant for a Consumer Goods (FMCG) company. 
 You are analyzing a database with 4 tables: product_master, store_master, sales_promotions, and inventory.
 Answer the following business question based on the data:
